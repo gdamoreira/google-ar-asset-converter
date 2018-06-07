@@ -1,0 +1,115 @@
+{
+  material: {
+    local kWhite = [1.0, 1.0, 1.0, 1.0],
+    local kBlack = [0.0, 0.0, 0.0, 1.0],
+    local propDiffuse = sfm.sourceProperty("DiffuseColor", kWhite),
+    local propSpecular = sfm.sourceProperty("SpecularColor", kBlack),
+    local propShadingModel = sfm.sourceProperty("ShadingModel", "Gouraud"),
+    local propShininess = sfm.sourceProperty("Shininess", 1.0),
+    local propOpacity = sfm.sourceProperty("Opacity", 1.0),
+    name: "FBX Material",
+    parameters: [
+      {
+        name: "baseColor",
+        description: "Base Color",
+        options: [
+          {
+            usage: "BaseColor",
+            default: sfm.sourceTexture("BaseColor"),
+            valid_if: sfm.hasSourceTexture("BaseColor"),
+            requires: ["uv0"],
+            fragment: |||
+              vec4 baseColorParam = %(lerpColor)s *
+                                    texture(materialParams_baseColor, getUV0());
+            ||| % { lerpColor: sfm.lerpColor() }
+          }, {
+            default: null,
+            fragment: |||
+              vec4 baseColorParam = %(lerpColor)s;
+            ||| % { lerpColor: sfm.lerpColor() }
+          },
+        ]
+      },
+      {
+        name: "baseColorTint",
+        description: "Base Color Tint",
+        options: [
+          {
+            default: propDiffuse,
+            valid_if: !(propDiffuse == kBlack),
+          },
+          {
+            default: kWhite,
+            valid_if: propDiffuse == kBlack,
+          },
+        ]
+      },
+      {
+        name: "metallic",
+        description: "Metalicity",
+        options: [
+          {
+            default: 1.0,
+            valid_if: !sfm.isGrayscale(propSpecular) &&
+                      propShadingModel=="Phong",
+          }, {
+            default: 0.0
+          }
+        ]
+      },
+      {
+        name: "roughness",
+        description: "Roughness",
+        options: [
+          {
+            default: std.sqrt(2.0 / (2.0 + propShininess)),
+            valid_if: propShadingModel=="Phong"
+          }, {
+            default: 1.0,
+            valid_if: propShadingModel=="Gouraud"
+          }
+        ]
+      },
+      {
+        name: "opacity",
+        description: "Conditionally enabled transparency",
+        options: [
+          {
+            default: null,
+            valid_if: propOpacity >= 1.0,
+            blending: "opaque",
+            fragment: ""
+          }, {
+            default: propOpacity,
+            valid_if: propOpacity < 1.0,
+            blending: "transparent",
+            fragment: |||
+               float opacity = material.baseColor.a * materialParams.opacity;
+               material.baseColor = vec4(material.baseColor.rgb * opacity,
+                                         opacity);
+            |||
+          }
+        ]
+      }
+    ],
+    requires: [
+      "position",
+    ],
+    shadingModel: "lit",
+  },
+
+  fragment: |||
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+
+        %(baseColor_code)s
+
+        material.baseColor = materialParams.baseColorTint *
+                             baseColorParam;
+        material.metallic = materialParams.metallic;
+        material.roughness = materialParams.roughness;
+
+        %(opacity_code)s
+    }
+  |||,
+}

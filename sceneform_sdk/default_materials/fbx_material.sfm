@@ -1,0 +1,189 @@
+{
+  local is_pbr = sfm.hasSourceProperty("metallic") &&
+                 sfm.hasSourceProperty("roughness") &&
+                 sfm.hasSourceProperty("base_color") &&
+                 sfm.hasSourceProperty("emissive"),
+  local propUseOpacityMap = sfm.sourceProperty("use_opacity_map", 0.0),
+  local kWhite4 = [1.0, 1.0, 1.0, 1.0],
+  local kWhite3 = [1.0, 1.0, 1.0],
+  local kBlack = [0.0, 0.0, 0.0, 1.0],
+  material: {
+    name: "FBX Material",
+    parameters: [
+      {
+        name: "baseColor",
+        description: "Base Color",
+        options: [
+          {
+            default: sfm.sourceProperty("base_color", kWhite3) + [1],
+            valid_if: is_pbr,
+          }, {
+            default: sfm.sourceProperty("DiffuseColor", kWhite3) + [1],
+          },
+        ]
+      },
+      {
+        name: "baseColorMap",
+        description: "Base Color Map",
+        options: [
+          {
+            usage: "BaseColor",
+            default: sfm.sourceTexture("BaseColor"),
+            valid_if: sfm.hasSourceTexture("BaseColor"),
+            requires: ["uv0"],
+            fragment: |||
+              vec4 baseColorMapValue = texture(materialParams_baseColorMap, getUV0());
+            |||
+          }, {
+            default: null,
+            fragment: |||
+              vec4 baseColorMapValue = vec4(1.0, 1.0, 1.0, 1.0);
+            |||
+          },
+        ]
+      },
+      {
+        name: "normalMap",
+        description: "Optional per-pixel normal mapping",
+        options: [
+          {
+            usage: "Normal",
+            default: sfm.sourceTexture("Normal"),
+            valid_if: sfm.hasSourceTexture("Normal"),
+            requires: ["uv0", "tangents"],
+            fragment: |||
+              vec3 tangentNormal = texture(materialParams_normalMap, getUV0()).xyz;
+              tangentNormal = normalize(tangentNormal*2.0 - 1.0);
+              material.normal = tangentNormal;
+            |||
+          }, {
+            default: null,
+            fragment: |||
+              material.normal = vec3(0, 0, 1);
+            |||
+          }
+        ]
+      },
+      {
+        name: "interpolatedColor",
+        description: "Interpolated Color",
+        options: [
+          {
+            default: null,
+            fragment: |||
+              vec4 interpolatedColor = %s;
+            ||| % [sfm.lerpColor()]
+          },
+        ]
+      },
+      {
+        name: "metallic",
+        description: "Metalicity",
+        options: [
+          {
+            default: sfm.sourceProperty("metallic", 0.0),
+          }
+        ]
+      },
+      {
+        name: "metallicMap",
+        description: "Metallic Map",
+        options: [
+          {
+            usage: "Metallic",
+            default: sfm.sourceTexture("Metallic"),
+            valid_if: sfm.hasSourceTexture("Metallic"),
+            requires: ["uv0"],
+            fragment: |||
+              float metallicMapValue = texture(materialParams_metallicMap, getUV0()).r;
+            |||
+          }, {
+            default: null,
+            fragment: |||
+              float metallicMapValue = 1.0;
+            |||
+          },
+        ]
+      },
+      {
+        name: "roughness",
+        description: "Roughness",
+        options: [
+          {
+            default: sfm.sourceProperty("roughness", 1.0),
+          }
+        ]
+      },
+      {
+        name: "roughnessMap",
+        description: "Roughness Map",
+        options: [
+          {
+            usage: "Roughness",
+            default: sfm.sourceTexture("Roughness"),
+            valid_if: sfm.hasSourceTexture("Roughness"),
+            requires: ["uv0"],
+            fragment: |||
+              float roughnessMapValue = texture(materialParams_roughnessMap, getUV0()).r;
+            |||
+          }, {
+            default: null,
+            fragment: |||
+              float roughnessMapValue = 1.0;
+            |||
+          },
+        ]
+      },
+      {
+        name: "reflectance",
+        description: "Reflectance",
+        options: [
+          { default: 0.5 },
+        ]
+      },
+      {
+        name: "opacity",
+        description: "Conditionally enabled transparency",
+        options: [
+          {
+            default: null,
+            valid_if: propUseOpacityMap != 1.0,
+            blending: "opaque",
+            fragment: ""
+          }, {
+            default: null,
+            valid_if: propUseOpacityMap == 1.0,
+            blending: "transparent",
+            fragment: |||
+               float a = material.baseColor.w;
+               material.baseColor = material.baseColor * vec4(a, a, a, 1.0);
+            |||
+          }
+        ]
+      }
+    ],
+    requires: [
+      "position",
+    ],
+    shadingModel: "lit",
+  },
+
+  fragment: |||
+    void material(inout MaterialInputs material) {
+        %(normalMap_code)s
+        prepareMaterial(material);
+
+        %(baseColorMap_code)s
+        %(metallicMap_code)s
+        %(roughnessMap_code)s
+        %(interpolatedColor_code)s
+
+        material.baseColor = materialParams.baseColor * baseColorMapValue *
+                             interpolatedColor;
+        material.metallic = materialParams.metallic * metallicMapValue;
+        material.roughness = materialParams.roughness * roughnessMapValue;
+        material.reflectance = materialParams.reflectance;
+        %(opacity_code)s
+    }
+  |||,
+}

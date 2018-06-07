@@ -1,0 +1,18 @@
+#!/bin/bash
+
+BIN_DIR=$(dirname $0)
+
+for material in $(find . -name "*.mat"); do
+  dir=$(dirname "$material")
+  name=$(basename "$material" .mat)
+  # Try to find compiled file
+  compiled=$(find . -not -path "*build/intermediate*" -and -name "$name.compiled_mat")
+  if [[ $(echo "$compiled" | wc -l) -gt 1 ]]; then
+    echo "ERROR: Found multiple compiled materials for $material"
+    continue
+  elif [[ -z $compiled ]]; then
+    compiled="$dir/$name.compiled_mat"
+  fi
+  echo Compiling $name.mat to $compiled...
+  "$BIN_DIR/matc" --optimize --platform=mobile --output="$compiled" "$material"
+done
