@@ -2,6 +2,7 @@
   local hasPackedMetallicRoughness = sfm.hasSourceTexture("Roughness") && sfm.sourceTexture("Roughness") == sfm.sourceTexture("Metallic"),
   local hasPackedOcclusionMetallicRoughness = hasPackedMetallicRoughness && sfm.hasSourceTexture("Occlusion") && sfm.sourceTexture("Occlusion") == sfm.sourceTexture("Roughness"),
   local alphaMode = sfm.sourceProperty("AlphaMode", "OPAQUE"),
+  local shadingModel = if sfm.sourceProperty("ShadingModel", "Pbr") == "Pbr" then "lit" else "unlit",
 
   material: {
     name: "Gltf 2 Metallic-Roughness Material",
@@ -24,13 +25,13 @@
             valid_if: sfm.hasSourceTexture("BaseColor"),
             requires: ["uv0"],
             fragment: |||
-              vec4 baseColor = %(lerpColor)s * materialParams.baseColorFactor * texture(materialParams_baseColor, getUV0());
+              material.baseColor = %(lerpColor)s * materialParams.baseColorFactor * texture(materialParams_baseColor, getUV0());
             ||| % { lerpColor: sfm.lerpColor() }
           },
           {
             default: null,
             fragment: |||
-              vec4 baseColor = %(lerpColor)s * materialParams.baseColorFactor;
+              material.baseColor = %(lerpColor)s * materialParams.baseColorFactor;
             ||| % { lerpColor: sfm.lerpColor() }
           },
         ]
@@ -78,19 +79,22 @@
         description: "Packed (Occlusion) + Metallic + Roughness Texture",
         options: [
           {
+            valid_if: shadingModel == "unlit",
+          },
+          {
             default: sfm.sourceTexture("Metallic"),
             valid_if: hasPackedMetallicRoughness,
             fragment: |||
               vec3 metallicRoughnessSample = texture(materialParams_metallicRoughness, getUV0()).xyz;
-              float metallic = materialParams.metallicFactor * metallicRoughnessSample.b;
-              float roughness = materialParams.roughnessFactor * metallicRoughnessSample.g;
+              material.metallic = materialParams.metallicFactor * metallicRoughnessSample.b;
+              material.roughness = materialParams.roughnessFactor * metallicRoughnessSample.g;
             |||
           },
           {
             default: null,
             fragment: |||
-              float metallic = materialParams.metallicFactor;
-              float roughness = materialParams.roughnessFactor;
+              material.metallic = materialParams.metallicFactor;
+              material.roughness = materialParams.roughnessFactor;
             |||
           },
         ],
@@ -100,26 +104,24 @@
         description: "Occlusion Texture",
         options: [
           {
+            valid_if: shadingModel == "unlit",
+          },
+          {
             default: sfm.sourceTexture("Occlusion"),
             valid_if: sfm.hasSourceTexture("Occlusion") && !hasPackedOcclusionMetallicRoughness,
             requires: ["uv0"],
             fragment: |||
-              float occlusion = texture(materialParams_occlusion, getUV0()).x;
+              material.ambientOcclusion = texture(materialParams_occlusion, getUV0()).x;
             |||
           },
           {
             default: null,
             valid_if: hasPackedOcclusionMetallicRoughness,
             requires: ["uv0"],
-            fragment: |||
-              float occlusion = metallicRoughnessSample.x;
-            |||
+            fragment: "material.ambientOcclusion = metallicRoughnessSample.x;",
           },
           {
-            default: null,
-            fragment: |||
-              float occlusion = 1.0;
-            |||
+            fragment: "material.ambientOcclusion = 1.0;",
           },
         ],
       },
@@ -137,18 +139,18 @@
         description: "Emissive Texture",
         options: [
           {
+            valid_if: shadingModel == "unlit"
+          },
+          {
             default: sfm.sourceTexture("Emissive"),
             valid_if: sfm.hasSourceTexture("Emissive"),
             requires: ["uv0"],
             fragment: |||
-              vec4 emissive = materialParams.emissiveFactor * texture(materialParams_emissive, getUV0());
+              material.emissive = materialParams.emissiveFactor * texture(materialParams_emissive, getUV0());
             |||
           },
           {
-            default: null,
-            fragment: |||
-              vec4 emissive = vec4(0.0);
-            |||
+            fragment: "material.emissive = vec4(0.0);",
           },
         ]
       },
@@ -156,7 +158,12 @@
         name: "reflectance",
         description: "Reflectance Factor",
         options: [
-          { default: 0.5 },
+          {
+            valid_if: shadingModel == "unlit",
+          },
+          {
+            fragment: "material.reflectance = 0.5;"
+          },
         ]
       },
       {
@@ -168,7 +175,7 @@
               valid_if: alphaMode == "BLEND",
               blending: "transparent",
               maskThreshold: 0.5,
-              fragment: "baseColor.xyz *= baseColor.w;",
+              fragment: "material.baseColor.xyz *= material.baseColor.w;",
           },
           {
               default: null,
@@ -192,7 +199,7 @@
       "tangents",
       "uv0"
     ],
-    shadingModel: "lit",
+    shadingModel: shadingModel,
   },
 
   fragment: |||
@@ -207,13 +214,7 @@
         %(occlusion_code)s
         %(emissive_code)s
         %(opacity_code)s
-
-        material.baseColor = baseColor;
-        material.emissive = emissive;
-        material.ambientOcclusion = occlusion;
-        material.roughness = roughness;
-        material.metallic = metallic;
-        material.reflectance = materialParams.reflectance;
+        %(reflectance_code)s
     }
   |||,
 }
