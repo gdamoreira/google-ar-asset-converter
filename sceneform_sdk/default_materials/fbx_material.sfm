@@ -154,10 +154,7 @@
             default: null,
             valid_if: propUseOpacityMap == 1.0,
             blending: "transparent",
-            fragment: |||
-               float a = material.baseColor.w;
-               material.baseColor = material.baseColor * vec4(a, a, a, 1.0);
-            |||
+            fragment: ""
           }
         ]
       }

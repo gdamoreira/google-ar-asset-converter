@@ -1,4 +1,9 @@
 {
+   bound_relative_root: {
+      x: 0.5,
+      y: 0,
+      z: 0.5,
+   },
    materials: [
       {
          name: "unlit_material",
@@ -36,6 +41,7 @@
       collision: {},
       file: "./input/andy.obj",
       name: "andy",
+      recenter: "root",
    },
    samplers: [
       {
@@ -44,5 +50,5 @@
          pipeline_name: "andy.png",
       },
    ],
-   version: "0.51:1",
+   version: "0.52:1",
 }

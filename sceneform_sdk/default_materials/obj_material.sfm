@@ -66,7 +66,7 @@
             valid_if: propShadingModel=="Phong"
           }, {
             default: 1.0,
-            valid_if: propShadingModel=="Gouraud"
+            valid_if: propShadingModel!="Phong"
           }
         ]
       },
@@ -84,9 +84,7 @@
             valid_if: propOpacity < 1.0 && propOpacity != 0.0,
             blending: "transparent",
             fragment: |||
-               float opacity = material.baseColor.a * materialParams.opacity;
-               material.baseColor = vec4(material.baseColor.rgb * opacity,
-                                         opacity);
+               material.baseColor = material.baseColor * materialParams.opacity;
             |||
           }
         ]

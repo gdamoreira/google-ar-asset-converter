@@ -1,5 +1,6 @@
 {
-  local hasPackedMetallicRoughness = sfm.hasSourceTexture("Roughness") && sfm.sourceTexture("Roughness") == sfm.sourceTexture("Metallic"),
+  local usesSpecularGlossinessExtension = sfm.sourceProperty("UsesSpecularGlossiness", false),
+  local hasPackedMetallicRoughness = !usesSpecularGlossinessExtension && sfm.hasSourceTexture("Roughness") && sfm.sourceTexture("Roughness") == sfm.sourceTexture("Metallic"),
   local hasPackedOcclusionMetallicRoughness = hasPackedMetallicRoughness && sfm.hasSourceTexture("Occlusion") && sfm.sourceTexture("Occlusion") == sfm.sourceTexture("Roughness"),
   local alphaMode = sfm.sourceProperty("AlphaMode", "OPAQUE"),
   local shadingModel = if sfm.sourceProperty("ShadingModel", "Pbr") == "Pbr" then "lit" else "unlit",
@@ -12,7 +13,10 @@
         description: "Base Color Factor",
         options: [
           {
+            valid_if: !usesSpecularGlossinessExtension,
             default: sfm.sourceProperty("BaseColor", [1.0, 1.0, 1.0, 1.0]),
+          },
+          {
           },
         ]
       },
@@ -22,7 +26,7 @@
         options: [
           {
             default: sfm.sourceTexture("BaseColor"),
-            valid_if: sfm.hasSourceTexture("BaseColor"),
+            valid_if: sfm.hasSourceTexture("BaseColor") && !usesSpecularGlossinessExtension,
             requires: ["uv0"],
             fragment: |||
               material.baseColor = %(lerpColor)s * materialParams.baseColorFactor * texture(materialParams_baseColor, getUV0());
@@ -30,9 +34,47 @@
           },
           {
             default: null,
+            valid_if: !usesSpecularGlossinessExtension,
             fragment: |||
               material.baseColor = %(lerpColor)s * materialParams.baseColorFactor;
             ||| % { lerpColor: sfm.lerpColor() }
+          },
+          {
+          },
+        ]
+      },
+      {
+        name: "diffuseColorFactor",
+        description: "Diffuse Color Factor",
+        options: [
+          {
+            valid_if: usesSpecularGlossinessExtension,
+            default: sfm.sourceProperty("DiffuseColor", [1.0, 1.0, 1.0, 1.0]),
+          },
+          {
+          },
+        ]
+      },
+      {
+        name: "diffuseColor",
+        description: "Diffuse Color Texture",
+        options: [
+          {
+            default: sfm.sourceTexture("DiffuseColor"),
+            valid_if: sfm.hasSourceTexture("DiffuseColor") && usesSpecularGlossinessExtension,
+            requires: ["uv0"],
+            fragment: |||
+              vec4 diffuseColor = %(lerpColor)s * materialParams.diffuseColorFactor * texture(materialParams_diffuseColor, getUV0());
+            ||| % { lerpColor: sfm.lerpColor() }
+          },
+          {
+            default: null,
+            valid_if: usesSpecularGlossinessExtension,
+            fragment: |||
+              vec4 diffuseColor = %(lerpColor)s * materialParams.diffuseColorFactor;
+            ||| % { lerpColor: sfm.lerpColor() }
+          },
+          {
           },
         ]
       },
@@ -61,7 +103,10 @@
         description: "Metallic Factor",
         options: [
           {
+            valid_if: !usesSpecularGlossinessExtension,
             default: sfm.sourceProperty("Metallic", 1.0),
+          },
+          {
           },
         ]
       },
@@ -70,20 +115,98 @@
         description: "Roughness Factor",
         options: [
           {
+            valid_if: !usesSpecularGlossinessExtension,
             default: sfm.sourceProperty("Roughness", 1.0),
           },
+          {
+          },
         ]
+      },
+      {
+        name: "specularFactor",
+        description: "Specular Factor",
+        options: [
+          {
+            valid_if: usesSpecularGlossinessExtension,
+            default: sfm.sourceProperty("SpecularColor", [1.0, 1.0, 1.0])[:3],
+          },
+          {
+          },
+        ],
+      },
+      {
+        name: "glossinessFactor",
+        description: "Glossiness Factor",
+        options: [
+          {
+            valid_if: usesSpecularGlossinessExtension,
+            default: sfm.sourceProperty("Glossiness", 1.0),
+          },
+          {
+          },
+        ],
+      },
+      {
+        name: "specularGlossiness",
+        description: "Packed Specular + Glossiness Texture",
+        options: [
+          {
+            valid_if: usesSpecularGlossinessExtension && sfm.hasSourceTexture("Specular"),
+            default: sfm.sourceTexture("Specular"),
+            requires: ["uv0"],
+          },
+          {
+          },
+        ],
+      },
+      {
+        name: "specularGlossinessCalculation",
+        description: "Computation to support the KHR_materials_pbrSpecularGlossiness extension",
+        options: [
+          {
+            valid_if: usesSpecularGlossinessExtension && sfm.hasSourceTexture("Specular"),
+            fragment: |||
+              const vec3 intensityConversion = vec3(0.299, 0.587, 0.114);
+              const float dielectricSpecular = 0.04;
+              const float epsilon = 1e-4;
+
+              vec3 diffuse = diffuseColor.xyz;
+              vec4 specularGlossinessSample = texture(materialParams_specularGlossiness, getUV0());
+              vec3 specular = materialParams.specularFactor * specularGlossinessSample.xyz;
+              float glossiness = materialParams.glossinessFactor * specularGlossinessSample.w;
+              float oneMinusSpecularStrength = 1.0 - max(max(specular.x, specular.y), specular.z);
+              float diffuseBrightness = max(sqrt(dot(diffuse * diffuse, intensityConversion)), epsilon);
+              float specularBrightness = max(sqrt(dot(specular * specular, intensityConversion)), epsilon);
+              float metallic;
+              if (specularBrightness < dielectricSpecular) {
+                metallic = 0.0;
+              } else {
+                float a = dielectricSpecular;
+                float b = diffuseBrightness * oneMinusSpecularStrength / (1.0 - dielectricSpecular) +  specularBrightness - 2.0 * dielectricSpecular;
+                float c = dielectricSpecular - specularBrightness;
+                float D = max(b * b - 4.0 * a * c, epsilon);
+                metallic = clamp((-b + sqrt(D)) / (2.0 * a), 0.0, 1.0);
+              }
+              vec3 baseColorFromDiffuse = diffuse * (oneMinusSpecularStrength / (1.0 - dielectricSpecular) / max(1.0 - metallic, epsilon));
+              vec3 baseColorFromSpecular = (specular - vec3(dielectricSpecular * (1.0 - metallic))) * (1.0 / max(metallic, epsilon));
+              vec3 baseColor = clamp(mix(baseColorFromDiffuse, baseColorFromSpecular, metallic * metallic), vec3(0.0), vec3(1.0));
+
+              material.baseColor = vec4(baseColor, diffuseColor.w);
+              material.metallic = metallic;
+              material.roughness = 1.0 - glossiness;
+            |||,
+          },
+          {
+          },
+        ],
       },
       {
         name: "metallicRoughness",
         description: "Packed (Occlusion) + Metallic + Roughness Texture",
         options: [
           {
-            valid_if: shadingModel == "unlit",
-          },
-          {
             default: sfm.sourceTexture("Metallic"),
-            valid_if: hasPackedMetallicRoughness,
+            valid_if: hasPackedMetallicRoughness && shadingModel == "lit" && !usesSpecularGlossinessExtension,
             fragment: |||
               vec3 metallicRoughnessSample = texture(materialParams_metallicRoughness, getUV0()).xyz;
               material.metallic = materialParams.metallicFactor * metallicRoughnessSample.b;
@@ -92,10 +215,13 @@
           },
           {
             default: null,
+            valid_if: shadingModel == "lit" && !usesSpecularGlossinessExtension,
             fragment: |||
               material.metallic = materialParams.metallicFactor;
               material.roughness = materialParams.roughnessFactor;
             |||
+          },
+          {
           },
         ],
       },
@@ -139,9 +265,6 @@
         description: "Emissive Texture",
         options: [
           {
-            valid_if: shadingModel == "unlit"
-          },
-          {
             default: sfm.sourceTexture("Emissive"),
             valid_if: sfm.hasSourceTexture("Emissive"),
             requires: ["uv0"],
@@ -175,7 +298,7 @@
               valid_if: alphaMode == "BLEND",
               blending: "transparent",
               maskThreshold: 0.5,
-              fragment: "material.baseColor.xyz *= material.baseColor.w;",
+              fragment: "",
           },
           {
               default: null,
@@ -210,7 +333,9 @@
         prepareMaterial(material);
 
         %(baseColor_code)s
+        %(diffuseColor_code)s
         %(metallicRoughness_code)s
+        %(specularGlossinessCalculation_code)s
         %(occlusion_code)s
         %(emissive_code)s
         %(opacity_code)s
