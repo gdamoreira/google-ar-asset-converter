@@ -7,7 +7,7 @@
     local propShadingModel = sfm.sourceProperty("ShadingModel", "Gouraud"),
     local propShininess = sfm.sourceProperty("Shininess", 1.0),
     local propOpacity = sfm.sourceProperty("Opacity", 1.0),
-    name: "FBX Material",
+    name: "OBJ Material",
     parameters: [
       {
         name: "baseColor",

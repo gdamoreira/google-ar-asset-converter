@@ -256,7 +256,7 @@
         description: "Emissive Factor",
         options: [
           {
-            default: sfm.sourceProperty("EmissiveColor", [1.0, 1.0, 1.0, 1.0]),
+            default: sfm.sourceProperty("EmissiveColor", [0.0, 0.0, 0.0, 0.0]),
           },
         ]
       },
@@ -266,7 +266,7 @@
         options: [
           {
             default: sfm.sourceTexture("Emissive"),
-            valid_if: sfm.hasSourceTexture("Emissive"),
+            valid_if: sfm.hasSourceTexture("Emissive") && shadingModel == "lit",
             requires: ["uv0"],
             fragment: |||
               material.emissive = materialParams.emissiveFactor * texture(materialParams_emissive, getUV0());
@@ -274,18 +274,6 @@
           },
           {
             fragment: "material.emissive = vec4(0.0);",
-          },
-        ]
-      },
-      {
-        name: "reflectance",
-        description: "Reflectance Factor",
-        options: [
-          {
-            valid_if: shadingModel == "unlit",
-          },
-          {
-            fragment: "material.reflectance = 0.5;"
           },
         ]
       },
@@ -339,7 +327,6 @@
         %(occlusion_code)s
         %(emissive_code)s
         %(opacity_code)s
-        %(reflectance_code)s
     }
   |||,
 }
