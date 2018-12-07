@@ -86,6 +86,12 @@
             fragment: |||
                material.baseColor = material.baseColor * materialParams.opacity;
             |||
+          }, {
+            default: 1.0,
+            blending: "transparent",
+            fragment: |||
+               material.baseColor = material.baseColor * materialParams.opacity;
+            |||
           }
         ]
       }

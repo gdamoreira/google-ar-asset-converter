@@ -273,8 +273,11 @@
             |||
           },
           {
-            fragment: "material.emissive = vec4(0.0);",
+            valid_if: shadingModel == "lit",
+            fragment: "material.emissive = materialParams.emissiveFactor;",
           },
+          {
+          }
         ]
       },
       {

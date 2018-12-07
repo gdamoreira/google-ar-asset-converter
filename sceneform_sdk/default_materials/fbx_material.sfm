@@ -135,13 +135,6 @@
         ]
       },
       {
-        name: "reflectance",
-        description: "Reflectance",
-        options: [
-          { default: 0.5 },
-        ]
-      },
-      {
         name: "opacity",
         description: "Conditionally enabled transparency",
         options: [
@@ -179,7 +172,6 @@
                              interpolatedColor;
         material.metallic = materialParams.metallic * metallicMapValue;
         material.roughness = materialParams.roughness * roughnessMapValue;
-        material.reflectance = materialParams.reflectance;
         %(opacity_code)s
     }
   |||,
