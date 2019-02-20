@@ -30,7 +30,11 @@
             requires: ["uv0"],
             fragment: |||
               material.baseColor = %(lerpColor)s * materialParams.baseColorFactor * texture(materialParams_baseColor, getUV0());
-            ||| % { lerpColor: sfm.lerpColor() }
+              %(untonemap)s
+            ||| % {
+              lerpColor: sfm.lerpColor(),
+              untonemap: if shadingModel == "unlit" then "material.baseColor.xyz = inverseTonemap(material.baseColor.xyz);" else "",
+            }
           },
           {
             default: null,
@@ -266,7 +270,7 @@
         options: [
           {
             default: sfm.sourceTexture("Emissive"),
-            valid_if: sfm.hasSourceTexture("Emissive") && shadingModel == "lit",
+            valid_if: sfm.hasSourceTexture("Emissive"),
             requires: ["uv0"],
             fragment: |||
               material.emissive = materialParams.emissiveFactor * texture(materialParams_emissive, getUV0());
