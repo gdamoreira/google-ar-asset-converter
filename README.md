@@ -29,3 +29,16 @@ See the [Sceneform API Reference](//developers.google.com/ar/reference/java/com/
 ## Terms & Conditions
 
 By downloading the Sceneform SDK for Android, you agree that the [Google APIs Terms of Service](//developers.google.com/terms/) governs your use thereof.
+
+## Converter and Matc Arguments
+
+To see the single available arguments call
+
+```
+./converter -h
+```
+or
+```
+./matc -h
+```
+repectively.
