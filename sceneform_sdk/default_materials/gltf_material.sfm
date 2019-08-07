@@ -317,6 +317,7 @@
       "tangents",
       "uv0"
     ],
+    doubleSided: sfm.sourceProperty("DoubleSided", false),
     shadingModel: shadingModel,
   },
 
