@@ -1,6 +1,13 @@
 Google ARCore Asset Converter
 =====================
 
+## Future from this repo
+After Google [released the 1.16.0 version](//github.com/google-ar/sceneform-android-sdk/releases/tag/v1.16.0%C2%A0) of the Sceneform they deprecated SFB and SFB Android Studio Plugin. They are adopting the use of GLTF format instead of the SFB.
+
+`Deprecates support for SFB & the SFB Sceneform Android Studio plugin (glTF can be used instead).`
+
+Facing this new reality I'm going to not do any update in this repo anymore.
+
 ## License
 
 Sceneform SDK for Android
